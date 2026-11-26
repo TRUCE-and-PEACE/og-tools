@@ -1,6 +1,6 @@
 # Contributing a Tool to opengadget.dev
 
-Every tool on **opengadget.dev** is a single folder in this repository (`yv3000/og-tools`).
+Every tool on **opengadget.dev** is a single folder in this repository (`TRUCE-and-PEACE/og-tools`).
 
 ## 1. Copy `_example/`
 

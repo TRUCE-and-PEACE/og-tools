@@ -6,3 +6,4 @@
 - [ ] `install.sh` overrides `pkg_install` / `pkg_post_install` with **no `sudo`**, installs under `$WEBI_OPT_DIR`, symlinks into `$WEBI_BIN_DIR`, and calls `webi_path_add`
 - [ ] `install.ps1` overrides `Pkg-Install` / `Pkg-PostInstall` with **no admin elevation**, installs under `$WEBI_OPT_DIR`, and calls `Webi-PathAdd`
 - [ ] Tested locally and verified safe for users
+
