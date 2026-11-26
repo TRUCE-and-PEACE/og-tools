@@ -1,0 +1,49 @@
+name: Validate Tool PRs
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate tool folders
+        run: |
+          node -e "
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const SLUG_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+          const REPO_RE = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
+          let count = 0;
+          for (const entry of fs.readdirSync('.', { withFileTypes: true })) {
+            if (!entry.isDirectory()) continue;
+            if (entry.name.startsWith('.') || entry.name.startsWith('_')) continue;
+            if (!SLUG_RE.test(entry.name)) {
+              throw new Error('Invalid tool folder slug: ' + entry.name);
+            }
+            const readmePath = path.join(entry.name, 'README.md');
+            const confPath = path.join(entry.name, 'releases.conf');
+            if (!fs.existsSync(readmePath) || !fs.existsSync(confPath)) {
+              throw new Error(entry.name + ' must contain README.md and releases.conf');
+            }
+            const readme = fs.readFileSync(readmePath, 'utf8').replace(/\r\n/g, '\n');
+            const fm = readme.match(/^---\n([\s\S]*?)\n---/);
+            if (!fm) throw new Error(readmePath + ' missing YAML frontmatter');
+            const hp = fm[1].match(/^homepage:\s*(.+)$/m);
+            if (!hp || !/^https?:\/\//i.test(hp[1].trim().replace(/^['\"]|['\"]$/g, ''))) {
+              throw new Error(readmePath + ' must have a valid http(s) homepage');
+            }
+            const conf = fs.readFileSync(confPath, 'utf8');
+            const src = conf.match(/^github_sources\s*=\s*(.+)$/m);
+            if (!src || !REPO_RE.test(src[1].trim())) {
+              throw new Error(confPath + ' must have github_sources = owner/repo');
+            }
+            count++;
+          }
+          console.log('Validated ' + count + ' tool folder(s).');
+          "

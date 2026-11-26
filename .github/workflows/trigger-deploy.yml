@@ -1,0 +1,20 @@
+name: Trigger opengadget.dev Rebuild
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  trigger-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Cloudflare Pages Deploy Hook
+        env:
+          CF_DEPLOY_HOOK_URL: ${{ secrets.CF_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$CF_DEPLOY_HOOK_URL" ]; then
+            echo "CF_DEPLOY_HOOK_URL secret is not set yet; skipping deploy trigger."
+            exit 0
+          fi
+          curl --proto '=https' --tlsv1.2 -fsS -X POST "$CF_DEPLOY_HOOK_URL"
+          echo "Triggered opengadget.dev Cloudflare Pages rebuild."
