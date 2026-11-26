@@ -23,10 +23,16 @@ function Pkg-Install {
 
   Set-Content -Path (Join-Path $optBin "bunpm.cmd") -Value "@echo off`r`nnode `"%~dp0..\core\wrapper.js`" %*" -Encoding ASCII
 
-  foreach ($cmd in @('bunpm.cmd', 'npm.cmd', 'npx.cmd', 'yarn.cmd', 'pnpm.cmd', 'bunpm', 'npm', 'npx', 'yarn', 'pnpm')) {
+  foreach ($cmd in @('bunpm.cmd', 'npm.cmd', 'npx.cmd', 'yarn.cmd', 'pnpm.cmd')) {
     $src = Join-Path $optBin $cmd
     if (Test-Path $src) {
-      Copy-Item -Path $src -Destination (Join-Path $WEBI_BIN_DIR $cmd) -Force
+      Set-Content -Path (Join-Path $WEBI_BIN_DIR $cmd) -Value "@echo off`r`n`"$src`" %*" -Encoding ASCII
+    }
+  }
+  foreach ($cmd in @('bunpm', 'npm', 'npx', 'yarn', 'pnpm')) {
+    $src = (Join-Path $optBin $cmd) -replace '\\', '/'
+    if (Test-Path (Join-Path $optBin $cmd)) {
+      Set-Content -Path (Join-Path $WEBI_BIN_DIR $cmd) -Value "#!/usr/bin/env sh`nexec `"$src`" `"`$@`"" -Encoding ASCII
     }
   }
 }
@@ -36,3 +42,4 @@ function Pkg-PostInstall {
   Write-Host "Installed $WEBI_PKG $WEBI_TAG to $WEBI_BIN_DIR"
   Write-Host "Run 'bunpm doctor' to verify."
 }
+

@@ -27,7 +27,8 @@ EOF
   chmod +x "$WEBI_OPT_DIR/bin/"*
   for cmd in bunpm npm npx yarn pnpm; do
     if [ -f "$WEBI_OPT_DIR/bin/$cmd" ]; then
-      ln -sf "$WEBI_OPT_DIR/bin/$cmd" "$WEBI_BIN_DIR/$cmd"
+      printf '#!/usr/bin/env sh\nexec "%s" "$@"\n' "$WEBI_OPT_DIR/bin/$cmd" > "$WEBI_BIN_DIR/$cmd"
+      chmod +x "$WEBI_BIN_DIR/$cmd"
     fi
   done
 }
@@ -37,3 +38,4 @@ pkg_post_install() {
   printf 'Installed %s %s to %s\n' "$WEBI_PKG" "$WEBI_TAG" "$WEBI_BIN_DIR"
   printf 'Run "bunpm doctor" to verify.\n'
 }
+
