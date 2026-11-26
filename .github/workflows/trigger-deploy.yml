@@ -18,3 +18,4 @@ jobs:
           fi
           curl --proto '=https' --tlsv1.2 -fsS -X POST "$CF_DEPLOY_HOOK_URL"
           echo "Triggered opengadget.dev Cloudflare Pages rebuild."
+

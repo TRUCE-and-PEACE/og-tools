@@ -19,3 +19,4 @@ mytool --help
 ```sh
 curl -sS https://opengadget.dev/mytool | sh
 ```
+

@@ -23,3 +23,4 @@ Create a lowercase folder `<tool-slug>/` matching `^[a-z0-9][a-z0-9_-]{0,63}$` w
 ## 3. Open a Pull Request
 
 The PR check validates your folder structure, frontmatter, and `releases.conf`. Once merged to `main`, Cloudflare Pages automatically rebuilds `https://opengadget.dev` so your tool page, OpenGraph card, and one-line installers go live right away.
+

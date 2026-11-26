@@ -15,3 +15,4 @@ function Pkg-PostInstall {
   Webi-PathAdd
   Write-Host "Installed $WEBI_PKG $WEBI_TAG to $WEBI_BIN_DIR"
 }
+

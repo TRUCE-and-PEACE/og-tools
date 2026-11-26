@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -12,38 +16,138 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate tool folders
+      - name: Validate tool folders (static rules)
+        id: check
         run: |
-          node -e "
+          node << 'EOF'
           const fs = require('node:fs');
           const path = require('node:path');
+
           const SLUG_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
           const REPO_RE = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
-          let count = 0;
+          const errors = [];
+          const validated = [];
+
           for (const entry of fs.readdirSync('.', { withFileTypes: true })) {
             if (!entry.isDirectory()) continue;
             if (entry.name.startsWith('.') || entry.name.startsWith('_')) continue;
-            if (!SLUG_RE.test(entry.name)) {
-              throw new Error('Invalid tool folder slug: ' + entry.name);
+
+            const slug = entry.name;
+            if (!SLUG_RE.test(slug)) {
+              errors.push(`\`${slug}/\`: invalid folder slug (must match \`^[a-z0-9][a-z0-9_-]{0,63}$\`)`);
+              continue;
             }
-            const readmePath = path.join(entry.name, 'README.md');
-            const confPath = path.join(entry.name, 'releases.conf');
-            if (!fs.existsSync(readmePath) || !fs.existsSync(confPath)) {
-              throw new Error(entry.name + ' must contain README.md and releases.conf');
+
+            const required = ['README.md', 'releases.conf', 'install.sh', 'install.ps1'];
+            const missing = required.filter((f) => !fs.existsSync(path.join(slug, f)));
+            if (missing.length) {
+              errors.push(`\`${slug}/\`: missing required file(s): ${missing.join(', ')}`);
+              continue;
             }
-            const readme = fs.readFileSync(readmePath, 'utf8').replace(/\r\n/g, '\n');
+
+            const readme = fs.readFileSync(path.join(slug, 'README.md'), 'utf8').replace(/\r\n/g, '\n');
             const fm = readme.match(/^---\n([\s\S]*?)\n---/);
-            if (!fm) throw new Error(readmePath + ' missing YAML frontmatter');
-            const hp = fm[1].match(/^homepage:\s*(.+)$/m);
-            if (!hp || !/^https?:\/\//i.test(hp[1].trim().replace(/^['\"]|['\"]$/g, ''))) {
-              throw new Error(readmePath + ' must have a valid http(s) homepage');
+            if (!fm) {
+              errors.push(`\`${slug}/README.md\`: missing YAML frontmatter delimited by \`---\``);
+            } else {
+              for (const field of ['title', 'homepage', 'tagline', 'version', 'tags']) {
+                if (!new RegExp(`^${field}:`, 'm').test(fm[1])) {
+                  errors.push(`\`${slug}/README.md\`: missing frontmatter field \`${field}\``);
+                }
+              }
+              const hp = fm[1].match(/^homepage:\s*(.+)$/m);
+              if (!hp || !/^https?:\/\//i.test(hp[1].trim().replace(/^['"]|['"]$/g, ''))) {
+                errors.push(`\`${slug}/README.md\`: \`homepage\` must start with \`https://\` or \`http://\``);
+              }
             }
-            const conf = fs.readFileSync(confPath, 'utf8');
+
+            const conf = fs.readFileSync(path.join(slug, 'releases.conf'), 'utf8').replace(/\r\n/g, '\n');
             const src = conf.match(/^github_sources\s*=\s*(.+)$/m);
             if (!src || !REPO_RE.test(src[1].trim())) {
-              throw new Error(confPath + ' must have github_sources = owner/repo');
+              errors.push(`\`${slug}/releases.conf\`: must define \`github_sources = owner/repo\``);
             }
-            count++;
+            if (!/^tag_prefix\s*=/m.test(conf)) {
+              errors.push(`\`${slug}/releases.conf\`: must define \`tag_prefix\``);
+            }
+
+            const installSh = fs.readFileSync(path.join(slug, 'install.sh'), 'utf8');
+            if (!/\bpkg_install\s*\(\s*\)/.test(installSh)) {
+              errors.push(`\`${slug}/install.sh\`: must define \`pkg_install()\``);
+            }
+            if (/(^|[^a-zA-Z0-9_-])sudo\s+/m.test(installSh)) {
+              errors.push(`\`${slug}/install.sh\`: \`sudo\` is not allowed (zero-sudo rule)`);
+            }
+
+            const installPs1 = fs.readFileSync(path.join(slug, 'install.ps1'), 'utf8');
+            if (!/function\s+Pkg-Install\b/i.test(installPs1)) {
+              errors.push(`\`${slug}/install.ps1\`: must define \`function Pkg-Install\``);
+            }
+            if (/-Verb\s+RunAs\b/i.test(installPs1)) {
+              errors.push(`\`${slug}/install.ps1\`: UAC elevation (\`-Verb RunAs\`) is not allowed`);
+            }
+
+            if (!errors.some((e) => e.startsWith(`\`${slug}/`))) {
+              validated.push(slug);
+            }
           }
-          console.log('Validated ' + count + ' tool folder(s).');
-          "
+
+          const lines = [
+            '<!-- og-tools-validator -->',
+            errors.length === 0
+              ? '### ✅ All opengadget / webi rules passed — ready for maintainer review!'
+              : '### ❌ Validation failed — please fix the issues below',
+            '',
+            `- **Validated tool(s):** ${validated.length ? validated.map((s) => `\`${s}\``).join(', ') : '_none_'}`,
+            '- **Files & schema:** `README.md`, `releases.conf`, `install.sh`, `install.ps1`',
+            '- **Safety checks:** Zero `sudo` / no UAC elevation, valid `https://` homepage & `owner/repo` source',
+            '- **Merge policy:** Manual maintainer review required (PRs are never auto-merged)',
+          ];
+
+          if (errors.length) {
+            lines.push('', '#### Errors', ...errors.map((e) => `- ${e}`));
+          }
+
+          const report = lines.join('\n') + '\n';
+          fs.writeFileSync('pr-report.md', report, 'utf8');
+          if (process.env.GITHUB_STEP_SUMMARY) {
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, report, 'utf8');
+          }
+
+          if (errors.length) {
+            console.error(errors.join('\n'));
+            process.exit(1);
+          }
+          console.log(`Validated ${validated.length} tool(s): ${validated.join(', ')}`);
+          EOF
+
+      - name: Post or update PR review status comment
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            if (!fs.existsSync('pr-report.md')) return;
+            const body = fs.readFileSync('pr-report.md', 'utf8');
+            const marker = '<!-- og-tools-validator -->';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

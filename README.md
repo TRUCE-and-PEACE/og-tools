@@ -18,3 +18,4 @@ Once a PR is merged to `main`, `opengadget.dev` automatically rebuilds and publi
 - `irm https://opengadget.dev/<tool-slug> | iex`
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) to add a tool.
+

@@ -12,3 +12,4 @@ pkg_post_install() {
   webi_path_add
   printf 'Installed %s %s to %s/%s\n' "$WEBI_PKG" "$WEBI_TAG" "$WEBI_BIN_DIR" "$WEBI_PKG"
 }
+
