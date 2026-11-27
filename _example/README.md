@@ -4,8 +4,13 @@ homepage: https://github.com/owner/mytool
 tagline: Short one-line description of what mytool does.
 version: v1.0.0
 tags: [CLI, Utilities]
-# Optional package manager fallbacks shown as tabs on the tool page:
+# Optional cross-OS package managers (first available shows as default across all OSes):
 # npm: mytool
+# pip: mytool
+# uv: mytool
+# cargo: mytool
+# go: github.com/owner/mytool/cmd/mytool
+# Optional macOS/Linux fallback:
 # brew: mytool
 ---
 

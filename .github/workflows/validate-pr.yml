@@ -26,6 +26,7 @@ jobs:
           const SLUG_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
           const REPO_RE = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
           const errors = [];
+          const warnings = [];
           const validated = [];
 
           for (const entry of fs.readdirSync('.', { withFileTypes: true })) {
@@ -50,14 +51,23 @@ jobs:
             if (!fm) {
               errors.push(`\`${slug}/README.md\`: missing YAML frontmatter delimited by \`---\``);
             } else {
-              for (const field of ['title', 'homepage', 'tagline', 'version', 'tags']) {
-                if (!new RegExp(`^${field}:`, 'm').test(fm[1])) {
+              for (const field of ['title', 'homepage', 'version']) {
+                if (!new RegExp(`^${field}:\\s*\\S+`, 'm').test(fm[1])) {
                   errors.push(`\`${slug}/README.md\`: missing frontmatter field \`${field}\``);
                 }
               }
               const hp = fm[1].match(/^homepage:\s*(.+)$/m);
               if (!hp || !/^https?:\/\//i.test(hp[1].trim().replace(/^['"]|['"]$/g, ''))) {
                 errors.push(`\`${slug}/README.md\`: \`homepage\` must start with \`https://\` or \`http://\``);
+              }
+              if (!/^tagline:\s*\S+/m.test(fm[1])) {
+                warnings.push(`\`${slug}/README.md\`: \`tagline\` is missing — add a short description so users recognize your tool easily.`);
+              }
+              if (!/^tags:\s*\S+/m.test(fm[1])) {
+                warnings.push(`\`${slug}/README.md\`: \`tags\` is missing — add tags (e.g. \`tags: [CLI]\`) for better discovery.`);
+              }
+              if (!/^(npm|pip|uv|cargo|go):\s*\S+/m.test(fm[1])) {
+                warnings.push(`\`${slug}/README.md\`: no cross-OS package manager (\`npm\`, \`pip\`, \`uv\`, \`cargo\`, or \`go\`) set — add one if your tool is published there so it shows as the default command across all OSes.`);
               }
             }
 
@@ -102,6 +112,10 @@ jobs:
             '- **Safety checks:** Zero `sudo` / no UAC elevation, valid `https://` homepage & `owner/repo` source',
             '- **Merge policy:** Manual maintainer review required (PRs are never auto-merged)',
           ];
+
+          if (warnings.length) {
+            lines.push('', '#### 💡 Recommendations (optional, helps users find & install your tool)', ...warnings.map((w) => `- ${w}`));
+          }
 
           if (errors.length) {
             lines.push('', '#### Errors', ...errors.map((e) => `- ${e}`));
